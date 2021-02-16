@@ -3,12 +3,14 @@ from __future__ import unicode_literals
 
 import string
 
-from regparser.grammar.unified import marker_subpart_title
+from regparser.grammar.unified import marker_subpart_title, marker_subparts_title
 from regparser.search import find_offsets, find_start, segments
 from regparser.tree import struct
 from regparser.tree.appendix.carving import find_appendix_start
 from regparser.tree.supplement import find_supplement_start
-
+from pyparsing import ParseException
+import logging
+logger = logging.getLogger(__name__)
 
 def build_empty_part(part):
     """ When a regulation doesn't have a subpart, we give it an emptypart (a
@@ -20,14 +22,24 @@ def build_empty_part(part):
 
 
 def build_subpart(text, part):
-    results = marker_subpart_title.parseString(text)
-    subpart_letter = results.subpart
-    subpart_title = results.subpart_title
-    label = [str(part), 'Subpart', subpart_letter]
+    try:
+        results = marker_subpart_title.parseString(text)
+        subpart_letter = results.subpart
+        subpart_title = results.subpart_title
+        label = [str(part), 'Subpart', subpart_letter]
 
-    return struct.Node(
-        "", [], label, subpart_title, node_type=struct.Node.SUBPART)
+        return struct.Node(
+            "", [], label, subpart_title, node_type=struct.Node.SUBPART)
 
+    except ParseException:
+        """ Return a dummy node, since this is likely a case where subparts are
+        reserved for future use."""
+        results = marker_subparts_title.parseString(text)
+        label = [str(part), 'Subpart', results[0]]
+        logger.warn("Could not parse subpart from text: {0}. Parsing as \
+        reserved subparts {1}".format(text, results[0]))
+        return struct.Node(
+            '', [], label, '', node_type=struct.Node.EMPTYPART)
 
 def subjgrp_label(starting_title, letter_list):
     words = starting_title.split()
